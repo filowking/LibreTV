@@ -518,29 +518,36 @@ function renderDoubanCards(data, container) {
             const card = document.createElement("div");
             card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
             
-            // 安全处理标题和评分（防止XSS）
-            const safeTitle = (item.title || '未知标题')
+            // 生成卡片内容，确保安全显示（防止XSS）
+            const safeTitle = item.title
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;');
             
-            const safeRate = (item.rate || item.rating?.average || "暂无")
-                .toString()
+            const safeRate = (item.rate || "暂无")
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;');
             
-            // === 关键修复：从 item 中获取原始封面图 URL ===
-            // 豆瓣返回的字段通常是 cover 或 image
-            const originalCoverUrl = item.cover || item.image || 'https://via.placeholder.com/200x300?text=No+Cover';
+                
             
-            // 构建代理后的图片 URL（优先使用你的 PROXY_URL）
-            let proxiedCoverUrl = originalCoverUrl;
+            // === 关键修复：构建多重 fallback 图片 URL ===
+            // 1. 原始 URL（带 no-referrer）
+            // 2. 自定义代理（如果你有 PROXY_URL）
+            // 3. 公共 CORS 代理（兜底）
+
+            let imgSrcList = [originalCoverUrl]; // 主图
+
+            // 如果你有自定义代理，加入第二选择
             if (typeof PROXY_URL !== 'undefined' && PROXY_URL) {
-                proxiedCoverUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
-            } else {
-                // 使用公共 CORS 代理作为 fallback
-                proxiedCoverUrl = `https://corsproxy.io/?${encodeURIComponent(originalCoverUrl)}`;
+                imgSrcList.push(PROXY_URL + encodeURIComponent(originalCoverUrl));
             }
+
+            // 加入公共 CORS 代理（可靠且免费）
+            imgSrcList.push(`https://corsproxy.io/?${encodeURIComponent(originalCoverUrl)}`);
+            // 或备选：`https://api.allorigins.win/raw?url=${encodeURIComponent(originalCoverUrl)}`
+
+            // 将图片 URL 列表转为 JSON 字符串，用于 onerror 逐个尝试
+            const imgSrcListJson = JSON.stringify(imgSrcList);
 
             // 为不同设备优化卡片布局
             card.innerHTML = `
@@ -554,7 +561,7 @@ function renderDoubanCards(data, container) {
                         <span class="text-yellow-400">★</span> ${safeRate}
                     </div>
                     <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
-                        <a href="${item.url || '#'}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看" onclick="event.stopPropagation();">
+                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看" onclick="event.stopPropagation();">
                             🔗
                         </a>
                     </div>
@@ -575,12 +582,6 @@ function renderDoubanCards(data, container) {
     // 清空并添加所有新元素
     container.innerHTML = "";
     container.appendChild(fragment);
-
-    // 移除加载遮罩
-    const loadingOverlay = container.querySelector('.absolute.inset-0.bg-black\\/80');
-    if (loadingOverlay) {
-        loadingOverlay.remove();
-    }
 }
 
 // 新增：智能图片错误处理函数（逐个尝试 fallback）
