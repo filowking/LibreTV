@@ -441,19 +441,58 @@ function renderRecommend(tag, pageLimit, pageStart) {
         });
 }
 
-// 在你的文件中找到并替换 fetchDoubanData 函数
 async function fetchDoubanData(url) {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    console.log('请求豆瓣API:', url);
+    
+    // 创建随机延迟，避免频繁请求
+    await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500));
     
     try {
-        const response = await fetch(proxyUrl);
-        const data = await response.json();
-        return JSON.parse(data.contents);
+        // 方法1：使用无验证的公共代理
+        const proxyUrl1 = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+        const response1 = await fetch(proxyUrl1, { timeout: 10000 });
+        if (response1.ok) {
+            const data = await response1.json();
+            return JSON.parse(data.contents);
+        }
+        
+        throw new Error('代理1失败');
     } catch (error) {
-        return { subjects: [] }; // 返回空数组避免错误
+        console.log('代理1失败:', error.message);
+        
+        try {
+            // 方法2：备用代理
+            const proxyUrl2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+            const response2 = await fetch(proxyUrl2, { timeout: 10000 });
+            if (response2.ok) {
+                return await response2.json();
+            }
+        } catch (error2) {
+            console.log('代理2失败:', error2.message);
+        }
+        
+        // 返回模拟数据
+        return {
+            subjects: [
+                {
+                    title: "热门电影推荐",
+                    rate: "8.5",
+                    cover: "https://images.weserv.nl/?w=200&h=300&fit=cover&url=https://img2.doubanio.com/view/photo/s_ratio_poster/public/p480747492.jpg",
+                    url: "#",
+                    year: new Date().getFullYear() - 1
+                },
+                {
+                    title: "经典电视剧",
+                    rate: "9.0",
+                    cover: "https://images.weserv.nl/?w=200&h=300&fit=cover&url=https://img1.doubanio.com/view/photo/s_ratio_poster/public/p2561716440.jpg",
+                    url: "#",
+                    year: new Date().getFullYear() - 2
+                }
+                // 可以添加更多备用数据
+            ]
+        };
     }
 }
-
 
 
 // 抽取渲染豆瓣卡片的逻辑到单独函数
