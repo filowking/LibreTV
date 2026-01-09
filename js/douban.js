@@ -528,13 +528,27 @@ function renderDoubanCards(data, container) {
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;');
             
-            // 处理图片URL
-            // 1. 直接使用豆瓣图片URL (添加no-referrer属性)
-            const originalCoverUrl = item.cover;
+                
             
-            // 2. 也准备代理URL作为备选
-            const proxiedCoverUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
-            
+            // === 关键修复：构建多重 fallback 图片 URL ===
+            // 1. 原始 URL（带 no-referrer）
+            // 2. 自定义代理（如果你有 PROXY_URL）
+            // 3. 公共 CORS 代理（兜底）
+
+            let imgSrcList = [originalCoverUrl]; // 主图
+
+            // 如果你有自定义代理，加入第二选择
+            if (typeof PROXY_URL !== 'undefined' && PROXY_URL) {
+                imgSrcList.push(PROXY_URL + encodeURIComponent(originalCoverUrl));
+            }
+
+            // 加入公共 CORS 代理（可靠且免费）
+            imgSrcList.push(`https://corsproxy.io/?${encodeURIComponent(originalCoverUrl)}`);
+            // 或备选：`https://api.allorigins.win/raw?url=${encodeURIComponent(originalCoverUrl)}`
+
+            // 将图片 URL 列表转为 JSON 字符串，用于 onerror 逐个尝试
+            const imgSrcListJson = JSON.stringify(imgSrcList);
+
             // 为不同设备优化卡片布局
             card.innerHTML = `
                 <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
@@ -568,6 +582,23 @@ function renderDoubanCards(data, container) {
     // 清空并添加所有新元素
     container.innerHTML = "";
     container.appendChild(fragment);
+}
+
+// 新增：智能图片错误处理函数（逐个尝试 fallback）
+function handleImageError(img, srcList) {
+    // 找到当前失败的索引
+    const currentIndex = srcList.indexOf(img.src);
+    const nextIndex = currentIndex + 1;
+    
+    // 如果还有下一个源，尝试加载
+    if (nextIndex < srcList.length) {
+        img.src = srcList[nextIndex];
+        console.log('尝试下一个图片源:', srcList[nextIndex]);
+    } else {
+        // 所有源都失败，显示占位图
+        img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPuW8oOWbveS4gOWkseWtmDwvdGV4dD48L3N2Zz4=';
+        img.classList.add('object-contain');
+    }
 }
 
 // 重置到首页
